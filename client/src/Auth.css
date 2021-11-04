@@ -81,5 +81,5 @@ button {
 }
 
 .card h2 {
-    margin-bottom: 0px;
+    margin-bottom: 0px !important;
 }

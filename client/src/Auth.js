@@ -12,7 +12,7 @@ const Auth = ({auth}) => {
     const [password, setPassword] = useState('');
 
     return (
-        <form onSubmit={e => auth(socketAddress, login, password) || e.preventDefault()}>
+        <div className="form" onSubmit={e => auth(socketAddress, login, password) || e.preventDefault()}>
             <div className="card card--inverted">
                 <h2>Web Terminal</h2>
                 <a href="https://github.com/Artemetr/minecraft-web-terminal">by artemetr</a>
@@ -35,7 +35,7 @@ const Auth = ({auth}) => {
                     <button onClick={e => auth(socketAddress, login, password) || e.preventDefault()}>Sign in</button>
                 </div>
             </div>
-        </form>
+        </div>
     );
 };
 

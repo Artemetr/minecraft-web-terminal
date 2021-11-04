@@ -8,8 +8,7 @@ let ws = null;
 const App = (props = {}) => {
     const [statusData, setStatusData] = useState({enabled: false});
     const [terminalLineData] = useState([
-        {type: LineType.Output, value: 'Welcome to the React Terminal UI Demo!'},
-        {type: LineType.Input, value: 'Some previous input received'},
+        {type: LineType.Output, value: 'Welcome to the Web Terminal for Minecraft Server!'}
     ]);
 
     const [isAuth, setIsAuth] = useState(false);

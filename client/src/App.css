@@ -1,4 +1,4 @@
-.container form {
+.container .form {
     display: flex;
     height: 100%;
     align-items: center;
@@ -6,7 +6,7 @@
     flex-flow: column;
 }
 
-.container form * {
+.container .form * {
     display: block;
     margin-bottom: 20px;
 }
