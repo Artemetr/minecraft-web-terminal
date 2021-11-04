@@ -13,6 +13,7 @@ from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 from src.logs_reader import tail
 from src.rcon import Rcon
 
+
 dotenv.load_dotenv()
 
 
@@ -34,12 +35,21 @@ class RconWorker(threading.Thread):
         threading.Thread.__init__(self)
         self.__rcon = Rcon(os.getenv('RCON_HOST'), os.getenv('RCON_PORT'), os.getenv('RCON_PASSWORD'))
         self.__commands_queue = Queue(512)
+        self.last_start = 0
 
     def run(self):
         while not STOP:
             item = self.__get_item()
             if item:
-                result = self.__rcon.exec(item)
+                if item == 'start':
+                    if not status_worker.server_enabled and os.getenv('SERVER_START_COMMAND') and time.time() - self.last_start > 120:
+                        os.system(os.getenv('SERVER_START_COMMAND'))
+                        self.last_start = time.time()
+                        result = 'Server starting...'
+                    else:
+                        result = 'Start command unavailable.'
+                else:
+                    result = self.__rcon.exec(item)
                 ws_worker.send_data_for_all_like_task({'action': 'log_message', 'result': result})
 
     def __get_item(self) -> dict or None:
