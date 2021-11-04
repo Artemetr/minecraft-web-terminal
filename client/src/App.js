@@ -19,7 +19,9 @@ const App = (props = {}) => {
     };
     const exec = command => {
         terminalLineData.push({type: LineType.Input, value: <div className="red">{command}</div>});
-        sendData({action: 'exec', command});
+        if (command) {
+            sendData({action: 'exec', command});
+        }
     }
 
     const auth = (socketAddress, login, password) => {

@@ -1,14 +1,14 @@
 import asyncio
-import dotenv
 import json
 import os
 import threading
 import time
-import websockets
-from mcstatus import MinecraftServer
 from queue import Queue
 
-from websockets.exceptions import ConnectionClosedOK
+import dotenv
+import websockets
+from mcstatus import MinecraftServer
+from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
 from src.logs_reader import tail
 from src.rcon import Rcon
@@ -47,9 +47,6 @@ class RconWorker(threading.Thread):
 
     def exec(self, command):
         self.__commands_queue.put(command)
-
-    def disconnect(self):
-        self.__rcon.disconnect()
 
 
 class StatusWorker(threading.Thread):
@@ -107,11 +104,14 @@ class LogsWorker(threading.Thread):
 
     def run(self):
         while not STOP:
-            for line in tail():
-                if STOP or not line and not status_worker.server_enabled:
-                    break
-                if line:
-                    self.__logs_queue.put(line)
+            try:
+                for line in tail():
+                    if STOP or not line and not status_worker.server_enabled:
+                        break
+                    if line:
+                        self.__logs_queue.put(line)
+            except FileNotFoundError as e:
+                print(e)
 
     def get_message(self) -> str:
         return self.__logs_queue.get_nowait() if not self.__logs_queue.empty() else None
@@ -136,7 +136,7 @@ class WSWorker(threading.Thread):
     async def send_data(self, data, websocket):
         try:
             await websocket.send(json.dumps(data))
-        except ConnectionClosedOK:
+        except (ConnectionClosedOK, ConnectionClosedError):
             self.connected.remove(websocket)
 
     def send_data_for_all_like_task(self, data, except_: list = None):
@@ -148,7 +148,7 @@ class WSWorker(threading.Thread):
                 try:
                     coro = websocket.send(data)
                     future = asyncio.run_coroutine_threadsafe(coro, loop)
-                except ConnectionClosedOK:
+                except (ConnectionClosedOK, ConnectionClosedError):
                     self.connected.remove(websocket)
 
     async def send_data_for_all(self, data, except_: list = None):
@@ -158,7 +158,7 @@ class WSWorker(threading.Thread):
             if websocket not in except_:
                 try:
                     await self.send_data(data, websocket)
-                except ConnectionClosedOK:
+                except (ConnectionClosedOK, ConnectionClosedError):
                     self.connected.remove(websocket)
 
     async def auth(self, websocket):
@@ -172,7 +172,7 @@ class WSWorker(threading.Thread):
                 await self.send_data(dict(status=False, action='auth', error='Invalid auth data'), websocket)
         except asyncio.TimeoutError:
             await self.send_data(dict(status=False, action='auth', error='Timeout'), websocket)
-        except ConnectionRefusedError:
+        except (ConnectionRefusedError, ConnectionClosedOK, ConnectionClosedError):
             pass
         except json.decoder.JSONDecodeError:
             await self.send_data(dict(status=False, action='auth', error='Invalid data format'), websocket)
@@ -233,4 +233,3 @@ if __name__ == '__main__':
         loop.run_forever()
     finally:
         STOP = True
-        rcon_worker.disconnect()
