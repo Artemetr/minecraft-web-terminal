@@ -1,4 +1,3 @@
-mcrcon==0.7.0
-mcstatus==6.5.0
+mctools==1.1.2
 websockets==10.0
 python-dotenv==0.19.1
