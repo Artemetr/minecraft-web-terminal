@@ -3,7 +3,7 @@ import threading
 from time import sleep
 
 from src.modules.workers_flags import WorkersFlags
-from src.tail import tail
+from src.modules.tail import tail
 
 
 def _mock_send(stats):
