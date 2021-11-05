@@ -38,6 +38,7 @@ class McRconWorker(threading.Thread):
         else:
             os.system(self._server_start_command)
             self._latest_start_time = time.time()
+            self._flag.server_is_running()
             result = 'Starting the server.'
 
         return result
