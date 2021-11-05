@@ -2,12 +2,24 @@ from mcrcon import MCRcon
 
 
 class McRcon(MCRcon):
-    def __init__(self, host, password, port=25575, tlsmode=0, timeout=5):
+    def __init__(self, host, password, port=25575, tlsmode=0, timeout=1):
         self.host = host
         self.password = password
         self.port = port
         self.tlsmode = tlsmode
         self.timeout = timeout
+
+    def exec(self, command: str, repeat=3):
+        try:
+            with self(host=self.host, port=self.port, password=self.password) as mc:
+                result = mc.command(f'{command}')
+        except:
+            if repeat > 0:
+                result = self.exec(command, repeat - 1)
+            else:
+                result = 'Server unavailable'
+
+        return result
 
 
 class Rcon:
