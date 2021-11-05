@@ -84,7 +84,7 @@ async def handle_message(websocket, message):
         command = data.get('command')
         if not command:
             await websockets_handler.send_data_async(
-                WsStandardResponses.log_message('The command cannot be empty. Try another way.',
+                WsStandardResponses.log_message('The command cannot be empty. Try another way',
                                                 WsLogMessageTypes.error), {websocket})
             return
 

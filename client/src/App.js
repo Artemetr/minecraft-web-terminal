@@ -39,11 +39,11 @@ const App = (props = {}) => {
 
         ws.onopen = function (e) {
             sendData({action: 'auth', data: {login, password}});
-            terminalLineData.push({type: LineType.Output, value: 'The connection is established.'});
+            terminalLineData.push({type: LineType.Output, value: 'The connection is established'});
         };
 
         ws.onclose = function (e) {
-            terminalLineData.push({type: LineType.Output, value: 'Connection lost.'});
+            terminalLineData.push({type: LineType.Output, value: 'Connection lost'});
             setIsAuth(false);
         };
 

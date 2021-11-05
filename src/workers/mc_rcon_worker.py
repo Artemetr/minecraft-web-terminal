@@ -35,16 +35,16 @@ class McRconWorker(threading.Thread):
 
     def _start_command(self) -> str:
         if not self._server_start_command:
-            result = 'The server startup command is not defined.'
+            result = 'The server startup command is not defined'
         elif not self._recovery_time_has_expired:
-            result = f'Server startup commands will be available in {int(self._recovery_time)} seconds.'
+            result = f'Server startup commands will be available in {int(self._recovery_time)} seconds'
         elif self._flags.is_server_running:
-            result = 'The server is already running.'
+            result = 'The server is already running'
         else:
             os.system(self._server_start_command)
             self._latest_start_time = time.time()
             self._flags.server_is_running()
-            result = 'Starting the server.'
+            result = 'Starting the server'
 
         return result
 
@@ -67,7 +67,7 @@ class McRconWorker(threading.Thread):
         except Exception as e:
             print('McRconWorker::_rcon_client_exec', e)
             # raise e  # What happens if you don't catch it?
-            result = f'Failed to execute the command: {command}. Try again or look in the logs.'
+            result = f'Failed to execute the command: {command}. Try again or look in the logs'
         finally:
             try:
                 rcon_client.stop()
@@ -88,6 +88,8 @@ class McRconWorker(threading.Thread):
 
             if command == 'start':
                 result = self._start_command()
+            elif not self._flags.is_server_running:
+                result = f'The command {command} cannot be executed while the server is turned off'
             else:
                 result = self._rcon_client_exec(command)
 
