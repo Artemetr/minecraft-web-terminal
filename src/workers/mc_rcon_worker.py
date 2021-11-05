@@ -48,19 +48,12 @@ class McRconWorker(threading.Thread):
 
         return result
 
-    @property
-    def _rcon_client(self) -> RCONClient:
-        if not self._rcon_client or not self._rcon_client.is_authenticated():
-            try:
-                self._rcon_client.stop()
-            except:
-                pass
+    def _get_rcon_client(self) -> RCONClient:
+        rcon_client = RCONClient(host=os.getenv('RCON_HOST'), port=int(os.getenv('RCON_PORT')),
+                                        format_method=BaseClient.REMOVE, timeout=self._server_timeout)
+        rcon_client.login(os.getenv('RCON_PASSWORD'))
 
-            self.__rcon_client = RCONClient(host=os.getenv('RCON_HOST'), port=int(os.getenv('RCON_PORT')),
-                                            format_method=BaseClient.REMOVE, timeout=self._server_timeout)
-            self.__rcon_client.login(os.getenv('RCON_PASSWORD'))
-
-        return self.__rcon_client
+        return rcon_client
 
     def _handle_stop_command(self, command):
         if command == 'stop':
@@ -68,12 +61,19 @@ class McRconWorker(threading.Thread):
 
     def _rcon_client_exec(self, command) -> str:
         try:
-            result = self._rcon_client.command(command)
+            rcon_client = self._get_rcon_client()
+            result = rcon_client.command(command)
             self._handle_stop_command(command)
         except Exception as e:
             print('McRconWorker::_rcon_client_exec', e)
             # raise e  # What happens if you don't catch it?
             result = f'Failed to execute the command: {command}. Try again or look in the logs.'
+        finally:
+            try:
+                rcon_client.stop()
+            except Exception as e:
+                print('McRconWorker::_rcon_client_exec::stop', e)
+                # raise e  # What happens if you don't catch it?
 
         return result
 

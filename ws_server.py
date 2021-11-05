@@ -25,7 +25,7 @@ def send_log(message):
 
 
 def send_ping(stats):
-    websockets_handler.send_data(dict(action='stats_message', response=stats))
+    websockets_handler.send_data(dict(action='stats_message', result=stats))
 
 
 def send_rcon(message):
