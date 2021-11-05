@@ -18,7 +18,7 @@ const App = (props = {}) => {
     };
     
     const exec = command => {
-        terminalLineData.push({type: LineType.Input, value: <div className="red">{command}</div>});
+        terminalLineData.push({type: LineType.Input, value: <div className="log-message-input">{command}</div>});
         if (command) {
             sendData({action: 'exec', data: {command}});
         }
@@ -49,14 +49,36 @@ const App = (props = {}) => {
 
         ws.onmessage = function (e) {
             const {status, action, result, error} = JSON.parse(e.data);
-            console.log(JSON.parse(e.data));
             if (error) {
                 console.error(error);
             }
             
             if (action === 'log_message') {
-                const {message, type} = result
-                terminalLineData.push({type: type === 'input' ? LineType.Input : LineType.Output, value: message});
+                const {message, type} = result;
+
+                let value = null;
+                let lineType = null;
+                if (type === 'input') {
+                    lineType = LineType.Input;
+                    value = <div className="log-message-input">{message}</div>;
+                } else if (type === 'output') {
+                    lineType = LineType.Output;
+                    value = <div className="log-message-output">{message}</div>;
+                } else if (type === 'error') {
+                    lineType = LineType.Output;
+                    value = <div className="log-message-error">{message}</div>;
+                } else if (type === 'warning') {
+                    lineType = LineType.Output;
+                    value = <div className="log-message-warning">{message}</div>;
+                } else if (type === 'success') {
+                    lineType = LineType.Output;
+                    value = <div className="log-message-success">{message}</div>;
+                } else {
+                    console.error('Undefined type', type);
+                    return;
+                }
+                
+                terminalLineData.push({type: lineType, value});
             } else if (action === 'stats_message') {
                 setStatusData(result);
             } else if (action === 'auth') {

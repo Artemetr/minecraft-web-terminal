@@ -80,3 +80,27 @@
     color: #d9515d !important;
     display: inline-block;
 }
+
+
+.log-message-input {
+    display: inline-block;
+}
+
+.log-message-output {
+    display: inline-block;
+}
+
+.log-message-error {
+    color: #d9515d !important;
+    display: inline-block;
+}
+
+.log-message-warning {
+    color: #f4c025 !important;
+    display: inline-block;
+}
+
+.log-message-success {
+    color: #3ec930 !important;
+    display: inline-block;
+}

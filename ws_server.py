@@ -28,8 +28,8 @@ def send_ping(stats):
     websockets_handler.send_data(dict(action='stats_message', result=stats))
 
 
-def send_rcon(message):
-    send_log(message)
+def send_rcon(message, type_):
+    websockets_handler.send_data(WsStandardResponses.log_message(message, type_))
 
 
 async def decode_message(websocket, message) -> (str, dict,):

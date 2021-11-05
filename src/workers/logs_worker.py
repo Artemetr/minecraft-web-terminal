@@ -2,11 +2,11 @@ import os
 import threading
 from time import sleep
 
-from src.modules.workers_flags import WorkersFlags
 from src.modules.tail import tail
+from src.modules.workers_flags import WorkersFlags
 
 
-def _mock_send(stats):
+def _mock_send(message):
     pass
 
 

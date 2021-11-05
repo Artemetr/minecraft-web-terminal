@@ -12,5 +12,7 @@ class WsStandardResponses:
 
 class WsLogMessageTypes:
     error = 'error'
+    warning = 'warning'
+    success = 'success'
     input = 'input'
     output = 'output'
