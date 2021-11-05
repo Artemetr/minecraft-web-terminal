@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 
+import dotenv
 import websockets
 
 from src.modules.websockets_handler import WebsocketsHandler
@@ -11,11 +12,12 @@ from src.workers.logs_worker import LogsWorker
 from src.workers.mc_ping_worker import McPingWorker
 from src.workers.mc_rcon_worker import McRconWorker
 
+dotenv.load_dotenv()
 SOCKET_HOST = os.getenv('SOCKET_HOST')
 SOCKET_PORT = int(os.getenv('SOCKET_PORT'))
 SOCKET_LOGIN = os.getenv('SOCKET_LOGIN')
 SOCKET_PASSWORD = os.getenv('SOCKET_PASSWORD')
-SOCKET_AUTH_TIMEOUT = int(os.getenv('SOCKET_AUTH_TIMEOUT')) or 5
+SOCKET_AUTH_TIMEOUT = int(os.getenv('SOCKET_AUTH_TIMEOUT') or 5)
 
 
 def send_log(message):
@@ -36,7 +38,8 @@ async def decode_message(websocket, message) -> (str, dict,):
         if not result.get('action') or not result.get('data') or type(result.get('action')) is not str:
             result = None
     except Exception as e:
-        print(e)
+        print('ws_server::decode_message', e)
+        # raise e  # What happens if you don't catch it?
         result = None
 
     if not result:
@@ -66,7 +69,8 @@ async def auth(websocket) -> bool:
     except asyncio.TimeoutError:
         await websockets_handler.send_data_async(WsStandardResponses.auth_timeout, {websocket})
     except Exception as e:
-        print(e)
+        print('ws_server::auth', e)
+        # raise e  # What happens if you don't catch it?
 
     return False
 
@@ -131,4 +135,3 @@ if __name__ == '__main__':
         asyncio.get_event_loop().run_forever()
     finally:
         workers_flags.stop()
-

@@ -12,7 +12,7 @@ def _mock_send(stats):
 
 
 class McPingWorker(threading.Thread):
-    _server_timeout = int(os.getenv('SERVER_TIMEOUT')) or 2
+    _server_timeout = int(os.getenv('SERVER_TIMEOUT') or 2)
 
     def __init__(self, flags: WorkersFlags):
         threading.Thread.__init__(self)
@@ -30,7 +30,8 @@ class McPingWorker(threading.Thread):
         try:
             result = cls._get_ping_client().ping()
         except Exception as e:
-            print(e)
+            print('McPingWorker::get_ping', e)
+            # raise e  # What happens if you don't catch it?
             result = None
 
         return result
@@ -40,7 +41,8 @@ class McPingWorker(threading.Thread):
         try:
             result = cls._get_ping_client().get_stats()
         except Exception as e:
-            print(e)
+            print('McPingWorker::get_ping', e)
+            # raise e  # What happens if you don't catch it?
             result = None
 
         return result

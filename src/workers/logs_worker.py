@@ -30,4 +30,5 @@ class LogsWorker(threading.Thread):
                     if line:
                         self._send(line)
             except Exception as e:
-                print(e)
+                print('LogsWorker::run', e)
+                # raise e  # What happens if you don't catch it?

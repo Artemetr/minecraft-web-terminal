@@ -18,10 +18,10 @@ class McRconWorker(threading.Thread):
     def __init__(self, flags: WorkersFlags):
         threading.Thread.__init__(self)
         self._flags = flags
-        self._server_timeout = int(os.getenv('SERVER_TIMEOUT')) or 2
+        self._server_timeout = int(os.getenv('SERVER_TIMEOUT') or 2)
         self._server_start_command = os.getenv('SERVER_START_COMMAND')
         self._server_start_command_recovery_time = float(os.getenv('SERVER_START_COMMAND_RECOVERY_TIME') or 120)
-        self._commands_queue = Queue(int(os.getenv('COMMANDS_QUEUE_SIZE')) or 128)
+        self._commands_queue = Queue(int(os.getenv('COMMANDS_QUEUE_SIZE') or 128))
         self._latest_start_time = 0
         self._send = _mock_send
 
@@ -71,7 +71,8 @@ class McRconWorker(threading.Thread):
             result = self._rcon_client.command(command)
             self._handle_stop_command(command)
         except Exception as e:
-            print(e)
+            print('McRconWorker::_rcon_client_exec', e)
+            # raise e  # What happens if you don't catch it?
             result = f'Failed to execute the command: {command}. Try again or look in the logs.'
 
         return result

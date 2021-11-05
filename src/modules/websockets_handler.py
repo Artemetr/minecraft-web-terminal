@@ -41,7 +41,8 @@ class WebsocketsHandler:
                 coro = websocket.send(data)
                 future = asyncio.run_coroutine_threadsafe(coro, self._loop)
             except Exception as e:
-                print(e)
+                print('WebsocketsHandler::send_data', e)
+                # raise e  # What happens if you don't catch it?
                 if self.is_existing_websocket(websocket):
                     self.remove_websocket(websocket)
 
@@ -57,6 +58,7 @@ class WebsocketsHandler:
             try:
                 await websocket.send(data)
             except Exception as e:
-                print(e)
+                print('WebsocketsHandler::send_data_async', e)
+                # raise e  # What happens if you don't catch it?
                 if self.is_existing_websocket(websocket):
                     self.remove_websocket(websocket)
