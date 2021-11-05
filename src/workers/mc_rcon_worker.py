@@ -39,7 +39,7 @@ class McRconWorker(threading.Thread):
             message = 'The server startup command is not defined'
             type_ = WsLogMessageTypes.error
         elif not self._recovery_time_has_expired:
-            message = f'Server startup commands will be available in {int(self._recovery_time)} seconds'
+            message = f'Server startup commands will be available in {int(self._recovery_time - self._server_start_command_recovery_time)} seconds'
             type_ = WsLogMessageTypes.warning
         elif self._flags.is_server_running:
             message = 'The server is already running'
