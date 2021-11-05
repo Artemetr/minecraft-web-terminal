@@ -3,13 +3,13 @@ import threading
 
 from mctools.mclient import BaseClient, QUERYClient
 
-from src.modules.workers_flag import WorkersFlag
+from src.modules.workers_flags import WorkersFlags
 
 
 class McQueryWorker(threading.Thread):
     _server_timeout = int(os.getenv('SERVER_TIMEOUT')) or 2
 
-    def __init__(self, flag: WorkersFlag):
+    def __init__(self, flag: WorkersFlags):
         threading.Thread.__init__(self)
         self._flag = flag
 

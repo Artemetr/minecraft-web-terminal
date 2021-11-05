@@ -2,25 +2,32 @@ import os
 import threading
 from time import sleep
 
-from src.modules.workers_flag import WorkersFlag
+from src.modules.workers_flags import WorkersFlags
 from src.tail import tail
 
 
+def _mock_send(stats):
+    pass
+
+
 class LogsWorker(threading.Thread):
-    def __init__(self, flag: WorkersFlag):
+    def __init__(self, flags: WorkersFlags):
         threading.Thread.__init__(self)
-        self._flag = flag
+        self._flags = flags
         self._log_file_path = os.getenv('LOGS_FILE')
+        self._send = _mock_send
+
+    def set_send(self, send):
+        self._send = send
 
     def run(self):
-        while self._flag.keep_working and self._log_file_path:
+        while self._flags.keep_working and self._log_file_path:
             try:
                 for line in tail(self._log_file_path):
-                    if not self._flag.keep_working or not self._flag.is_server_running and not line:
+                    if not self._flags.keep_working or not self._flags.is_server_running and not line:
                         sleep(1)
                         break
                     if line:
-                        # TODO отсылать всем полученную строку логов
-                        pass
+                        self._send(line)
             except Exception as e:
                 print(e)

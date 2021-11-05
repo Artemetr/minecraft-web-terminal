@@ -7,18 +7,23 @@ from queue import Empty
 from mctools import RCONClient
 from mctools.mclient import BaseClient
 
-from src.modules.workers_flag import WorkersFlag
+from src.modules.workers_flags import WorkersFlags
+
+
+def _mock_send(stats):
+    pass
 
 
 class McRconWorker(threading.Thread):
-    def __init__(self, flag: WorkersFlag):
+    def __init__(self, flags: WorkersFlags):
         threading.Thread.__init__(self)
-        self._flag = flag
+        self._flags = flags
         self._server_timeout = int(os.getenv('SERVER_TIMEOUT')) or 2
         self._server_start_command = os.getenv('SERVER_START_COMMAND')
         self._server_start_command_recovery_time = float(os.getenv('SERVER_START_COMMAND_RECOVERY_TIME') or 120)
         self._commands_queue = Queue(int(os.getenv('COMMANDS_QUEUE_SIZE')) or 128)
         self._latest_start_time = 0
+        self._send = _mock_send
 
     @property
     def _recovery_time(self) -> float:
@@ -33,12 +38,12 @@ class McRconWorker(threading.Thread):
             result = 'The server startup command is not defined.'
         elif not self._recovery_time_has_expired:
             result = f'Server startup commands will be available in {int(self._recovery_time)} seconds.'
-        elif self._flag.is_server_running:
+        elif self._flags.is_server_running:
             result = 'The server is already running.'
         else:
             os.system(self._server_start_command)
             self._latest_start_time = time.time()
-            self._flag.server_is_running()
+            self._flags.server_is_running()
             result = 'Starting the server.'
 
         return result
@@ -59,7 +64,7 @@ class McRconWorker(threading.Thread):
 
     def _handle_stop_command(self, command):
         if command == 'stop':
-            self._flag.server_is_stopped()
+            self._flags.server_is_stopped()
 
     def _rcon_client_exec(self, command) -> str:
         try:
@@ -71,8 +76,11 @@ class McRconWorker(threading.Thread):
 
         return result
 
+    def set_send(self, send):
+        self._send = send
+
     def run(self):
-        while self._flag.keep_working:
+        while self._flags.keep_working:
             command = self._get_command()
             if not command:
                 continue
@@ -82,8 +90,7 @@ class McRconWorker(threading.Thread):
             else:
                 result = self._rcon_client_exec(command)
 
-            # TODO Сделать чтоб результат выполнения команды рассылался всем и вся
-            # ws_worker.send_data_for_all_like_task({'action': 'log_message', 'result': result})
+            self._send(result)
 
     def _get_command(self) -> str or None:
         try:

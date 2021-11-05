@@ -1,245 +1,134 @@
 import asyncio
 import json
 import os
-import threading
-import time
-from queue import Queue
 
-import dotenv
 import websockets
-from mcstatus import MinecraftServer
-from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
-from src.logs_reader import tail
-from src.rcon import Rcon
-
-
-dotenv.load_dotenv()
-
-
-class ServerStatus:
-    online = 'online'
-    offline = 'offline'
-
+from src.modules.websockets_handler import WebsocketsHandler
+from src.modules.workers_flags import WorkersFlags
+from src.modules.ws_standard_responses import WsStandardResponses, WsLogMessageTypes
+from src.workers.logs_worker import LogsWorker
+from src.workers.mc_ping_worker import McPingWorker
+from src.workers.mc_rcon_worker import McRconWorker
 
 SOCKET_HOST = os.getenv('SOCKET_HOST')
 SOCKET_PORT = int(os.getenv('SOCKET_PORT'))
 SOCKET_LOGIN = os.getenv('SOCKET_LOGIN')
 SOCKET_PASSWORD = os.getenv('SOCKET_PASSWORD')
-STOP = False
-connected = set()
+SOCKET_AUTH_TIMEOUT = int(os.getenv('SOCKET_AUTH_TIMEOUT')) or 5
 
 
-class RconWorker(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.__rcon = Rcon(os.getenv('RCON_HOST'), os.getenv('RCON_PORT'), os.getenv('RCON_PASSWORD'))
-        self.__commands_queue = Queue(512)
-        self.last_start = 0
-
-    def run(self):
-        while not STOP:
-            item = self.__get_item()
-            if item:
-                if item == 'start':
-                    if not status_worker.server_enabled and os.getenv('SERVER_START_COMMAND') and time.time() - self.last_start > 120:
-                        os.system(os.getenv('SERVER_START_COMMAND'))
-                        self.last_start = time.time()
-                        result = 'Server starting...'
-                    else:
-                        result = 'Start command unavailable.'
-                else:
-                    result = self.__rcon.exec(item)
-                ws_worker.send_data_for_all_like_task({'action': 'log_message', 'result': result})
-
-    def __get_item(self) -> dict or None:
-        return self.__commands_queue.get_nowait() if not self.__commands_queue.empty() else None
-
-    def exec(self, command):
-        self.__commands_queue.put(command)
+def send_log(message):
+    websockets_handler.send_data(WsStandardResponses.log_message(message, WsLogMessageTypes.output))
 
 
-class StatusWorker(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.__server = MinecraftServer(os.getenv('QUERY_HOST'), int(os.getenv('QUERY_PORT')))
-        self.__status = ServerStatus.offline
-        self.__ping = None
-        self.__query = None
-        self.__messages_queue = Queue(1)
-
-    def __get_info__(self):
-        try:
-            self.__ping = self.__server.ping()
-            self.__query = self.__server.query()
-            self.__status = ServerStatus.online
-        except:
-            self.__status = ServerStatus.offline
-
-        self.__build_message__()
-
-    @property
-    def server_enabled(self):
-        return self.__status == ServerStatus.online
-
-    def run(self):
-        while not STOP:
-            self.__get_info__()
-            time.sleep(2)
-
-    def __build_message__(self):
-        enabled = self.__status == ServerStatus.online
-        message = {'enabled': enabled}
-        if enabled:
-            message['players'] = {
-                'max': self.__query.players.max,
-                'online': self.__query.players.online,
-                'names': self.__query.players.names
-            }
-            message['ping'] = self.__ping
-            message['motd'] = self.__query.motd
-            message['version'] = self.__query.software.version
-            message['plugins'] = self.__query.software.plugins
-            message['brand'] = self.__query.software.brand
-        self.__messages_queue.put(message)
-
-    def get_message(self) -> dict or None:
-        return self.__messages_queue.get_nowait() if not self.__messages_queue.empty() else None
+def send_ping(stats):
+    websockets_handler.send_data(dict(action='stats_message', response=stats))
 
 
-class LogsWorker(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.__logs_queue = Queue(int(os.getenv('LOGS_QUEUE_MAX_SIZE')))
-
-    def run(self):
-        while not STOP:
-            try:
-                for line in tail():
-                    if STOP or not line and not status_worker.server_enabled:
-                        break
-                    if line:
-                        self.__logs_queue.put(line)
-            except FileNotFoundError as e:
-                print(e)
-
-    def get_message(self) -> str:
-        return self.__logs_queue.get_nowait() if not self.__logs_queue.empty() else None
+def send_rcon(message):
+    send_log(message)
 
 
-class WSWorker(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.connected = set()
+async def decode_message(websocket, message) -> (str, dict,):
+    try:
+        result = json.loads(message)
+        if not result.get('action') or not result.get('data') or type(result.get('action')) is not str:
+            result = None
+    except Exception as e:
+        print(e)
+        result = None
 
-    def run(self):
-        while not STOP:
-            if self.connected:
-                log_message = logs_worker.get_message()
-                if log_message:
-                    self.send_data_for_all_like_task(dict(action='log_message', result=log_message))
+    if not result:
+        await websockets_handler.send_data_async(WsStandardResponses.invalid_data_format, {websocket})
+        return None, None
 
-                status_message = status_worker.get_message()
-                if status_message:
-                    self.send_data_for_all_like_task(dict(action='status_message', result=status_message))
+    return result.get('action'), result.get('data')
 
-    async def send_data(self, data, websocket):
-        try:
-            await websocket.send(json.dumps(data))
-        except (ConnectionClosedOK, ConnectionClosedError):
-            self.connected.remove(websocket)
 
-    def send_data_for_all_like_task(self, data, except_: list = None):
-        if except_ is None:
-            except_ = []
-        data = json.dumps(data)
-        for websocket in self.connected.copy():
-            if websocket not in except_:
-                try:
-                    coro = websocket.send(data)
-                    future = asyncio.run_coroutine_threadsafe(coro, loop)
-                except (ConnectionClosedOK, ConnectionClosedError):
-                    self.connected.remove(websocket)
+async def auth(websocket) -> bool:
+    if websockets_handler.is_existing_websocket(websocket):
+        await websockets_handler.send_data_async(WsStandardResponses.auth_failed, {websocket})
+        return False
 
-    async def send_data_for_all(self, data, except_: list = None):
-        if except_ is None:
-            except_ = []
-        for websocket in self.connected.copy():
-            if websocket not in except_:
-                try:
-                    await self.send_data(data, websocket)
-                except (ConnectionClosedOK, ConnectionClosedError):
-                    self.connected.remove(websocket)
+    try:
+        message = await asyncio.wait_for(websocket.recv(), timeout=SOCKET_AUTH_TIMEOUT)
+        action, data = await decode_message(websocket, message)
+        if not message:
+            return False
 
-    async def auth(self, websocket):
-        try:
-            message = await asyncio.wait_for(websocket.recv(), timeout=5)
-            data = json.loads(message)
-            if data['login'] == SOCKET_LOGIN or data['password'] == SOCKET_PASSWORD:
-                self.connected.add(websocket)
-                await self.send_data(dict(status=True, action='auth'), websocket)
-            else:
-                await self.send_data(dict(status=False, action='auth', error='Invalid auth data'), websocket)
-        except asyncio.TimeoutError:
-            await self.send_data(dict(status=False, action='auth', error='Timeout'), websocket)
-        except (ConnectionRefusedError, ConnectionClosedOK, ConnectionClosedError):
-            pass
-        except json.decoder.JSONDecodeError:
-            await self.send_data(dict(status=False, action='auth', error='Invalid data format'), websocket)
-
-    async def handler(self, websocket, path):
-        if websocket not in self.connected.copy():
-            await self.auth(websocket)
-
-        if websocket in self.connected.copy():
-            try:
-                async for message in websocket:
-                    await self.message_process(websocket, message)
-            finally:
-                if websocket in connected:
-                    self.connected.remove(websocket)
-
-    async def message_process(self, websocket, message):
-        try:
-            data = json.loads(message)
-        except json.decoder.JSONDecodeError:
-            await self.send_data(dict(status=False, error='Invalid data format'), websocket)
-            return
-
-        action = data.get('action')
-        if not action:
-            await self.send_data(dict(status=False, error='Empty action'), websocket)
-            return
-
-        if action == 'exec':
-            command = data.get('command')
-            if not command:
-                await self.send_data(dict(action='log_message', result='Empty command'), websocket)
-                return
-
-            await self.send_data_for_all(dict(action='exec', result=command), [websocket])
-            rcon_worker.exec(command)
-            return
+        if action != 'auth' or data.get('login') == SOCKET_LOGIN or data.get('password') == SOCKET_PASSWORD:
+            websockets_handler.add_websocket(websocket)
+            await websockets_handler.send_data_async(WsStandardResponses.success_auth, {websocket})
+            return True
         else:
-            await self.send_data(websocket=websocket, data=dict(status=False, action=action, error='Undefined action'))
+            await websockets_handler.send_data_async(WsStandardResponses.auth_failed, {websocket})
+    except asyncio.TimeoutError:
+        await websockets_handler.send_data_async(WsStandardResponses.auth_timeout, {websocket})
+    except Exception as e:
+        print(e)
+
+    return False
+
+
+async def handle_message(websocket, message):
+    action, data = await decode_message(websocket, message)
+    if not action:
+        return
+
+    if action == 'exec':
+        command = data.get('command')
+        if not command:
+            await websockets_handler.send_data_async(
+                WsStandardResponses.log_message('The command cannot be empty. Try another way.',
+                                                WsLogMessageTypes.error), {websocket})
             return
+
+        await websockets_handler.send_data_async(WsStandardResponses.log_message(command, WsLogMessageTypes.input),
+                                                 without={websocket})
+        mc_rcon_worker.put(str(command))
+        return
+    else:
+        await websockets_handler.send_data_async(WsStandardResponses.undefined_action, {websocket})
+        return
+
+
+async def handle(websocket, path):
+    is_auth = await auth(websocket)
+    if not is_auth:
+        return
+
+    async for message in websocket:
+        await handle_message(websocket, message)
+
+    if websockets_handler.is_existing_websocket(websocket):
+        websockets_handler.remove_websocket(websocket)
 
 
 if __name__ == '__main__':
-    ws_worker = WSWorker()
-    rcon_worker = RconWorker()
-    status_worker = StatusWorker()
-    logs_worker = LogsWorker()
+    loop = asyncio.get_event_loop()
+
+    workers_flags = WorkersFlags()
+    websockets_handler = WebsocketsHandler(loop)
+
+    mc_rcon_worker = McRconWorker(workers_flags)
+    mc_rcon_worker.set_send(send_rcon)
+
+    logs_worker = LogsWorker(workers_flags)
+    logs_worker.set_send(send_log)
+
+    mc_ping_worker = McPingWorker(workers_flags)
+    mc_ping_worker.set_send(send_ping)
 
     try:
-        status_worker.start()
-        rcon_worker.start()
         logs_worker.start()
-        ws_worker.start()
+        mc_ping_worker.start()
+        mc_rcon_worker.start()
 
-        wss = websockets.serve(ws_worker.handler, SOCKET_HOST, SOCKET_PORT)
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(wss)
-        loop.run_forever()
+        start_server = websockets.serve(handle, SOCKET_HOST, SOCKET_PORT)
+
+        asyncio.get_event_loop().run_until_complete(start_server)
+        asyncio.get_event_loop().run_forever()
     finally:
-        STOP = True
+        workers_flags.stop()
+

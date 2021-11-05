@@ -1,4 +1,4 @@
-class WorkersFlag:
+class WorkersFlags:
     def __init__(self):
         self._keep_working = True
         self._is_server_running = False
