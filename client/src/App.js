@@ -30,7 +30,7 @@ const App = (props = {}) => {
             ws = null;
         } catch (e) {
         }
-        ws = new WebSocket(`ws://${socketAddress}`);
+        ws = new WebSocket(`${socketAddress}`);
         ws.onerror = function (e) {
             console.error(e);
             alert('Something wrong...');
